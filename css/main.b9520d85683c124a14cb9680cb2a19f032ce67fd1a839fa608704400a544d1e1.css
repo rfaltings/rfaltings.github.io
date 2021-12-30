@@ -7,6 +7,7 @@
 --bgcolor: #effae5;
 --darkMaincolor: var(--bgcolor);
 --darkacolor: rgb(233, 199, 122);
+--darkBgcolor: var(--maincolor);
 }
 html {
   color: var(--maincolor);
@@ -14,6 +15,7 @@ html {
   font-size: 18px;
   line-height: 1.6em;
 }
+
 body{
   display: block;
   margin: 8px;
@@ -25,7 +27,7 @@ body{
 
 ::selection {
   background: var(--maincolor);
-  color: #fff;
+  color: var(--bgcolor);
 }
 
 p {
@@ -203,11 +205,11 @@ h1, h2, h3, h4, h5, h6 {
   margin-bottom: 0em;
 }
 
-h1::after {
+h1::after { 
   content:' ';
   display:block;
   border: 0;
-  border-top: 2px solid var(--maincolor);
+  border-top: 1px solid var(--maincolor);
   margin: 0 0;
 }
 

@@ -1,17 +1,14 @@
-body {
+html {
   color: var(--darkMaincolor);
-  background-color: #000000;
 }
 
-::-moz-selection {
-  background: blue;
-  color: #fff;
-  text-shadow: none;
+body {
+  background-color: var(--darkBgcolor);
 }
 
 ::selection {
-  background: red;
-  color: #fff;
+  background: var(--darkMaincolor);
+  color: var(--darkBgcolor);
   text-shadow: none;
 }
 
@@ -33,16 +30,7 @@ pre {
 }
 blockquote {
   border-color: blue;
-}
-
-h1,
-h2,
-h3,
-h4,
-h5,
-h6 {
-  color: #ddd;
-}
+} 
 
 
 /* Links */
@@ -96,7 +84,7 @@ header {
 }
 
 h1::after {
-  border-top: 2px solid var(--darkMaincolor);
+  border-top: 1px solid var(--darkMaincolor);
 }
 
 .highlight {
