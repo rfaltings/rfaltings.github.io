@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html><head>
+	<meta charset="utf-8" />
+	<meta http-equiv="X-UA-Compatible" content="IE=edge"><title> - Richard Faltings</title>
+	<link rel="icon" type="image/png" href=/images/favicon.png /><meta name="viewport" content="width=device-width, initial-scale=1">
+	<meta name="description" content="Introduction to Reinforcement Learning for Economists Run on Google Colab to test out the code!
+The purpose of this post is to introduce some basic concepts from the reinforcement learning (RL) literature using the setting and notation that is familiar to economists studying infinite horizon dynamic decision problems. In particular, I make use of Rust (1987)&rsquo;s bus engine replacement problem as a demonstrative example.
+Note: the methods discussed here are mainly concerned with solving the dynamic problem, and not with estimation." />
+
+    
+	<script src="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js"></script>
+
+    
+	<link href="https://fonts.googleapis.com/css2?family=Arsenal&display=swap" rel="stylesheet">
+		<link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville&display=swap" rel="stylesheet">
+        <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@1,500&display=swap" rel="stylesheet">
+
+	
+	<link rel="stylesheet" type="text/css" media="screen" href="https://rfaltings.github.io/css/main.b9520d85683c124a14cb9680cb2a19f032ce67fd1a839fa608704400a544d1e1.css" />
+		<link id="darkModeStyle" rel="stylesheet" type="text/css" href="https://rfaltings.github.io/css/dark.4918cbc2089c2522264fd8a0a23dc745bdb36434e03e6dbd2b3db7ff18ed69f2.css"  disabled />
+	
+	
+	
+	
+
+</head>
+<body>
+        <div class="content"><header>
+	<div class="main">
+		<a href="https://rfaltings.github.io">Richard Faltings</a>
+	</div>
+	<nav>
+		
+		
+		
+						
+			
+				
+				
+				
+				
+				<a href="/research/" class="">Research</a> | 
+			 
+		
+						
+			
+				
+				<a href="/files/cv/rfaltings_cv.pdf" target="_blank"	>CV</a> | 
+				
+			 
+		
+						
+			
+				
+				
+				
+				
+				<a href="/other/" class="">Other</a> | 
+			 
+		
+
+
+
+		<a id="dark-mode-toggle" onclick="toggleTheme()" href=""><i data-feather="moon"></i></a>
+		<script src="https://rfaltings.github.io/js/themetoggle.js"></script>
+		<script>feather.replace()</script>
+		
+	</nav>
+</header>
+<main>
+	<article>
+		<section class="body">
+			<h1 id="introduction-to-reinforcement-learning-for-economists">Introduction to Reinforcement Learning for Economists</h1>
+<p><a href="https://colab.research.google.com/github/rfaltings/RL_econ/blob/main/RL_econ.ipynb">Run on Google Colab</a> to test out the code!</p>
+<p>The purpose of this post is to introduce some basic concepts from the reinforcement learning (RL) literature using the setting and notation that is familiar to economists studying infinite horizon dynamic decision problems. In particular, I make use of Rust (1987)&rsquo;s bus engine replacement problem as a demonstrative example.</p>
+<p><strong>Note</strong>: the methods discussed here are mainly concerned with solving the dynamic problem, and not with estimation.</p>
+<p>For those unfamiliar with RL, here are some recent breakthrough examples of these methods</p>
+<ul>
+<li><a href="https://www.youtube.com/watch?v=8tq1C8spV_g">AlphaGo beating human Go champion</a></li>
+<li><a href="https://www.youtube.com/watch?v=dJ4rWhpAGFI">Playing Atari games by only observing raw image input</a></li>
+<li><a href="https://www.youtube.com/watch?v=ZhsEKTo7V04">Robotic manipulation of arbitrary objects</a></li>
+</ul>
+<p>What is notable about these applications?</p>
+<p>They all involve notable <strong>complexity</strong>:</p>
+<ol>
+<li>A complex/large state space, as in the case of Go</li>
+<li>Complex transition dynamics, which are analytically intractible, as in the case of Atari games</li>
+<li>Complex policy functions, as is the case with the large number of motors involved in robotic manipulation</li>
+</ol>
+<p>The reader should keep these more complex applications in mind. This notebook focuses on a simple case for expositional purposes, with some particular features that RL struggles with. The real power of the latter methods is only apparent in much more complex situations, which I hope to revisit in future posts.</p>
+<hr>
+<h1 id="setup-and-notation">Setup and Notation</h1>
+<p>The methods presented here are appropriate for <strong>finite Markov Decision Processes</strong>, characterized by the following:</p>
+<p>States: $x \in \mathcal{X}$, finite</p>
+<p>Actions: $a \in \mathcal{A}(x)$, finite</p>
+<p>Transition probabilities: $p(x&rsquo;|x,a)$</p>
+<p>Flow utility: $u(x,a)$</p>
+<p>Discount rate: $\beta$</p>
+<p>Policy function: $a^*(x) \in \mathcal{A}(x)$</p>
+<p>The agent&rsquo;s problem:
+$$
+\begin{align}
+\max_{a^<em>} \mathbb{E}<em>{x_1,x_2,\dots} &amp;\Big[ \sum</em>{t=0}^\infty \beta^t u(x,a) | x_0 \Big] \
+&amp;s.t. \
+a_t &amp;= a^</em>(x_t) \
+Pr(x_{t+1}|x_t) &amp;= p(x_{t+1}|x_t,a^*(x_t)) \
+\end{align}
+$$</p>
+<p>We can write the problem in recursive form using the Bellman equation</p>
+<p>$$
+V(x) = \max_{a \in \mathcal{A}(x)} u(x,a) + \beta \sum_{x&rsquo; \in \mathcal{X}} V(x&rsquo;) p(x&rsquo;|x,a)
+$$</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#f92672">import</span> random
+</span></span><span style="display:flex;"><span><span style="color:#f92672">import</span> matplotlib.pyplot <span style="color:#66d9ef">as</span> plt
+</span></span><span style="display:flex;"><span><span style="color:#f92672">import</span> torch
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">class</span> <span style="color:#a6e22e">dynamic_problem</span>:
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">def</span> __init__(self, nbX, nbA, P, u, β):
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>nbX <span style="color:#f92672">=</span> nbX
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>nbA <span style="color:#f92672">=</span> nbA
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>P <span style="color:#f92672">=</span> P
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>u <span style="color:#f92672">=</span> u
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>β <span style="color:#f92672">=</span> β
+</span></span></code></pre></div><h1 id="bus-engine-replacement">Bus Engine replacement</h1>
+<p>Recall the problem studied by Rust (1987):</p>
+<ol>
+<li>Bus engines get worn over time and require increasing amounts of maintenance each month.</li>
+<li>Alternatively, the entire engine can be replaced at a high fixed cost</li>
+</ol>
+<p>Here, the state variable $x$ represents the mileage of the engine. The actions space at every period is $\mathcal{A} = {0,1}$, where $1$ implies replacing the engine.</p>
+<p>Utilities are:</p>
+<ul>
+<li>$u(x,0) = -c(x)$</li>
+<li>$u(x,1) = -R - c(0)$</li>
+</ul>
+<p>with $c(x) = \theta x$. For the remainder, we fix $\theta = 8.6*10^{-4}$ and $R = 8000$.</p>
+<p>The transition process for $x$ is s.t.:</p>
+<ul>
+<li>Conditional on $a_t = 0$,  $x_{t+1} - x_t \sim$ Exponential($\lambda$)</li>
+<li>Conditional on $a_t = 1$,  $x_{t+1} \sim$ Exponential($\lambda$)</li>
+</ul>
+<p>This process will be discretized into a 201-point grid for $x \in [0, 300000]$ with a spacing of $1500$ miles in between points.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span>nbX <span style="color:#f92672">=</span> <span style="color:#ae81ff">201</span>
+</span></span><span style="display:flex;"><span>nbA <span style="color:#f92672">=</span> <span style="color:#ae81ff">2</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># Constructing the x_grid and transition probabilities</span>
+</span></span><span style="display:flex;"><span>λ <span style="color:#f92672">=</span> <span style="color:#ae81ff">1</span><span style="color:#f92672">/</span><span style="color:#ae81ff">1500</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">exp_cdf</span>(c:float, λ):
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span> <span style="color:#ae81ff">1</span> <span style="color:#f92672">-</span> torch<span style="color:#f92672">.</span>exp(<span style="color:#f92672">-</span>λ <span style="color:#f92672">*</span> c)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>x_grid <span style="color:#f92672">=</span> torch<span style="color:#f92672">.</span>linspace(<span style="color:#ae81ff">0</span>,<span style="color:#ae81ff">3</span><span style="color:#f92672">*</span><span style="color:#ae81ff">10e4</span>, nbX)
+</span></span><span style="display:flex;"><span>x_diff <span style="color:#f92672">=</span> torch<span style="color:#f92672">.</span>maximum(x_grid[:,<span style="color:#66d9ef">None</span>] <span style="color:#f92672">-</span> x_grid[<span style="color:#66d9ef">None</span>,:], torch<span style="color:#f92672">.</span>zeros(<span style="color:#ae81ff">1</span>)) <span style="color:#75715e"># Get all the differences</span>
+</span></span><span style="display:flex;"><span>x_diff <span style="color:#f92672">=</span> torch<span style="color:#f92672">.</span>cat([x_diff, torch<span style="color:#f92672">.</span>ones(<span style="color:#ae81ff">1</span>, nbX) <span style="color:#f92672">*</span> <span style="color:#ae81ff">1e36</span>], <span style="color:#ae81ff">0</span>)
+</span></span><span style="display:flex;"><span>P0 <span style="color:#f92672">=</span> exp_cdf(x_diff, λ) <span style="color:#75715e"># Get CDFs at all the interval boundaries</span>
+</span></span><span style="display:flex;"><span>P0 <span style="color:#f92672">=</span> P0[<span style="color:#ae81ff">1</span>:,] <span style="color:#f92672">-</span> P0[:<span style="color:#f92672">-</span><span style="color:#ae81ff">1</span>,] <span style="color:#75715e"># Convert to PMF of the intervals</span>
+</span></span><span style="display:flex;"><span>P1 <span style="color:#f92672">=</span> P0[:,<span style="color:#ae81ff">0</span>][:,<span style="color:#66d9ef">None</span>]<span style="color:#f92672">.</span>repeat(<span style="color:#ae81ff">1</span>,nbX) <span style="color:#75715e"># Transition probabilities conditional on replacement is just transition probabilities from the first state. The syntax [:,None] adds an empty dimension at the specified place.</span>
+</span></span><span style="display:flex;"><span>P <span style="color:#f92672">=</span> torch<span style="color:#f92672">.</span>stack([P0,P1],<span style="color:#f92672">-</span><span style="color:#ae81ff">1</span>)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># Utilities</span>
+</span></span><span style="display:flex;"><span>θ <span style="color:#f92672">=</span> <span style="color:#ae81ff">1e-3</span>
+</span></span><span style="display:flex;"><span>R <span style="color:#f92672">=</span> <span style="color:#ae81ff">8000</span>
+</span></span><span style="display:flex;"><span>u <span style="color:#f92672">=</span> <span style="color:#66d9ef">lambda</span> x : torch<span style="color:#f92672">.</span>stack([<span style="color:#f92672">-</span>θ<span style="color:#f92672">*</span>x, <span style="color:#f92672">-</span>torch<span style="color:#f92672">.</span>tensor(R)<span style="color:#f92672">.</span>repeat(len(x))], <span style="color:#f92672">-</span><span style="color:#ae81ff">1</span>)<span style="color:#f92672">.</span>squeeze()
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># Discount factor</span>
+</span></span><span style="display:flex;"><span>β <span style="color:#f92672">=</span> <span style="color:#ae81ff">0.97</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>bus_problem <span style="color:#f92672">=</span> dynamic_problem(nbX, nbA, P, u(x_grid), β)
+</span></span><span style="display:flex;"><span>bus_problem<span style="color:#f92672">.</span>x_grid <span style="color:#f92672">=</span> x_grid
+</span></span></code></pre></div><h3 id="rust-1987-solution">Rust (1987) solution</h3>
+<p>Rust&rsquo;s approach uses the contraction mapping property of the Bellman equation to iterate over choice-specific value functions (which we will call <strong>Q-functions</strong>).</p>
+<p>Let:
+$$
+Q(x,a) \equiv u(x,a) + \beta \sum_{x&rsquo; \in \mathcal{X}} V(x&rsquo;) p(x&rsquo;|x,a)
+$$</p>
+<p>Then we have the following contraction mapping:
+$$
+Q(x,a) = u(x,a) + \beta \sum_{x \in \mathcal{X}} p(x&rsquo;|x,a) \arg \max_{y \in \mathcal{Y}(x)} Q_{x&rsquo;y}
+$$</p>
+<p>This is almost the contraction mapping from Rust (1987), simply without the random utility component.</p>
+<p>This can be iterated on $Q(x,a)$ to solve the problem.</p>
+<h4 id="algorithm">Algorithm</h4>
+<blockquote>
+<p>Denote the current iteration by $k$. Initialize $k=0$, $Q^0$</p>
+<p>For every $k=0,1,\dots$:</p>
+<ul>
+<li>$Q^{k+1}(x,a) = u(x,a) + \beta \sum_{x \in \mathcal{X}} p(x&rsquo;|x,a) \arg \max_{a \in \mathcal{A}(x)} Q^k(x&rsquo;,a), \quad \forall (x,a)$</li>
+<li>Stop when $|Q^k - Q^{k-1}| &lt; \delta$</li>
+</ul>
+</blockquote>
+<p><strong>Key point</strong>: notice that at every iteration $k$, the update is performed over $|\mathcal{X}|\cdot|\mathcal{A}|$ points.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">cmap</span>(self, Q_init, tol, max_iter <span style="color:#f92672">=</span> float(<span style="color:#e6db74">&#39;inf&#39;</span>)):
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e"># Initialize</span>
+</span></span><span style="display:flex;"><span>    Q_k <span style="color:#f92672">=</span> Q_init<span style="color:#f92672">.</span>clone()
+</span></span><span style="display:flex;"><span>    tol <span style="color:#f92672">=</span> <span style="color:#ae81ff">1e-8</span>
+</span></span><span style="display:flex;"><span>    k <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>
+</span></span><span style="display:flex;"><span>    diff_hist <span style="color:#f92672">=</span> []
+</span></span><span style="display:flex;"><span>    diff <span style="color:#f92672">=</span> tol <span style="color:#f92672">+</span> <span style="color:#ae81ff">1</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">while</span> (diff <span style="color:#f92672">&gt;</span> tol) <span style="color:#f92672">&amp;</span> (k <span style="color:#f92672">&lt;</span> max_iter):
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># Compute new Q</span>
+</span></span><span style="display:flex;"><span>        Q_k1 <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>u <span style="color:#f92672">+</span>  self<span style="color:#f92672">.</span>β <span style="color:#f92672">*</span> torch<span style="color:#f92672">.</span>sum(self<span style="color:#f92672">.</span>P <span style="color:#f92672">*</span> Q_k<span style="color:#f92672">.</span>max(<span style="color:#ae81ff">1</span>)[<span style="color:#ae81ff">0</span>][:,<span style="color:#66d9ef">None</span>,<span style="color:#66d9ef">None</span>],<span style="color:#ae81ff">0</span>)
+</span></span><span style="display:flex;"><span>        
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># Record difference</span>
+</span></span><span style="display:flex;"><span>        diff <span style="color:#f92672">=</span> torch<span style="color:#f92672">.</span>norm(Q_k1 <span style="color:#f92672">-</span> Q_k)
+</span></span><span style="display:flex;"><span>        diff_hist<span style="color:#f92672">.</span>append(diff)
+</span></span><span style="display:flex;"><span>        
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># Update Q</span>
+</span></span><span style="display:flex;"><span>        Q_k <span style="color:#f92672">=</span> Q_k1
+</span></span><span style="display:flex;"><span>        
+</span></span><span style="display:flex;"><span>        k <span style="color:#f92672">+=</span> <span style="color:#ae81ff">1</span>
+</span></span><span style="display:flex;"><span>        
+</span></span><span style="display:flex;"><span>    diff_hist <span style="color:#f92672">=</span> torch<span style="color:#f92672">.</span>stack(diff_hist)
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">if</span> diff <span style="color:#f92672">&lt;=</span> tol:
+</span></span><span style="display:flex;"><span>        print(<span style="color:#e6db74">&#34;Iteration converged after &#34;</span> <span style="color:#f92672">+</span> <span style="color:#e6db74">&#34;</span><span style="color:#e6db74">{:,}</span><span style="color:#e6db74">&#34;</span><span style="color:#f92672">.</span>format(self<span style="color:#f92672">.</span>nbX<span style="color:#f92672">*</span>self<span style="color:#f92672">.</span>nbA<span style="color:#f92672">*</span>k) <span style="color:#f92672">+</span> <span style="color:#e6db74">&#34; function updates&#34;</span>) 
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">else</span>:
+</span></span><span style="display:flex;"><span>        print(<span style="color:#e6db74">&#34;Hit maximum iterations after &#34;</span> <span style="color:#f92672">+</span> <span style="color:#e6db74">&#34;</span><span style="color:#e6db74">{:,}</span><span style="color:#e6db74">&#34;</span><span style="color:#f92672">.</span>format(self<span style="color:#f92672">.</span>nbX<span style="color:#f92672">*</span>self<span style="color:#f92672">.</span>nbA<span style="color:#f92672">*</span>k) <span style="color:#f92672">+</span> <span style="color:#e6db74">&#34; function updates&#34;</span>)         
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span> Q_k, diff_hist
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>dynamic_problem<span style="color:#f92672">.</span>cmap <span style="color:#f92672">=</span> cmap
+</span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#f92672">%%</span>time
+</span></span><span style="display:flex;"><span>Q_init <span style="color:#f92672">=</span> torch<span style="color:#f92672">.</span>ones(bus_problem<span style="color:#f92672">.</span>nbX, bus_problem<span style="color:#f92672">.</span>nbA) <span style="color:#f92672">*</span> <span style="color:#f92672">-</span><span style="color:#ae81ff">2000</span>
+</span></span><span style="display:flex;"><span>tol <span style="color:#f92672">=</span> <span style="color:#ae81ff">1e-8</span>
+</span></span><span style="display:flex;"><span>Q_sol_rust, diff_hist_rust <span style="color:#f92672">=</span> bus_problem<span style="color:#f92672">.</span>cmap(Q_init,tol)
+</span></span></code></pre></div><pre><code>Iteration converged after 207,432 function updates
+CPU times: user 209 ms, sys: 109 ms, total: 318 ms
+Wall time: 49.5 ms
+</code></pre>
+<h4 id="computational-performance">Computational performance</h4>
+<p>In terms of compute time, the classic method is extremely fast, despite having to perform what seems like a large (&gt;200K) number of updates. Partly this can be attributed to the ease of executing the algorithm in parallel with very little overhead.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#75715e"># Plots</span>
+</span></span><span style="display:flex;"><span>fig, axs <span style="color:#f92672">=</span> plt<span style="color:#f92672">.</span>subplots(<span style="color:#ae81ff">2</span>, figsize<span style="color:#f92672">=</span>(<span style="color:#ae81ff">10</span>, <span style="color:#ae81ff">10</span>))
+</span></span><span style="display:flex;"><span>axs[<span style="color:#ae81ff">0</span>]<span style="color:#f92672">.</span>plot(x_grid, Q_sol_rust[:,<span style="color:#ae81ff">1</span>]<span style="color:#f92672">-</span>Q_sol_rust[:,<span style="color:#ae81ff">0</span>], label <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;Contraction mapping&#34;</span>)
+</span></span><span style="display:flex;"><span>axs[<span style="color:#ae81ff">0</span>]<span style="color:#f92672">.</span>set_xlabel(<span style="color:#e6db74">&#34;Miles&#34;</span>)
+</span></span><span style="display:flex;"><span>axs[<span style="color:#ae81ff">0</span>]<span style="color:#f92672">.</span>set_ylabel(<span style="color:#e6db74">&#34;Relative value of replacement&#34;</span>)
+</span></span><span style="display:flex;"><span>axs[<span style="color:#ae81ff">0</span>]<span style="color:#f92672">.</span>legend()
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>axs[<span style="color:#ae81ff">1</span>]<span style="color:#f92672">.</span>plot(x_grid, Q_sol_rust[:,<span style="color:#ae81ff">1</span>]<span style="color:#f92672">-</span>Q_sol_rust[:,<span style="color:#ae81ff">0</span>] <span style="color:#f92672">&gt;=</span> <span style="color:#ae81ff">0</span>, label <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;Contraction mapping&#34;</span>)
+</span></span><span style="display:flex;"><span>axs[<span style="color:#ae81ff">1</span>]<span style="color:#f92672">.</span>set_xlabel(<span style="color:#e6db74">&#34;Miles&#34;</span>)
+</span></span><span style="display:flex;"><span>axs[<span style="color:#ae81ff">1</span>]<span style="color:#f92672">.</span>set_ylabel(<span style="color:#e6db74">&#34;Replacement policy&#34;</span>)
+</span></span><span style="display:flex;"><span>axs[<span style="color:#ae81ff">1</span>]<span style="color:#f92672">.</span>legend()
+</span></span></code></pre></div><pre><code>&lt;matplotlib.legend.Legend at 0x14031d1b0&gt;
+</code></pre>
+<p><img src="output_9_1.png" alt="png"></p>
+<h4 id="benchmark-solution">Benchmark solution</h4>
+<p>By leveraging the contraction mapping property of the Bellman equation and by iterating over all $(x,a)$ pairs equally, we can be sure that the solution we have obtained is correct up to our specified error tolerance.</p>
+<p>To benchmark the other solutions, we can compare:</p>
+<ol>
+<li>The difference in payoffs between replacing and not replacing as implied by the computed Q-functions (upper plot).</li>
+<li>The resulting policy function or argmax (lower plot).</li>
+</ol>
+<hr>
+<h1 id="q-learning">Q-learning</h1>
+<p>Q-learning, introduced by Watkins (1989) is another way of solving such an MDP.</p>
+<p>An intuitive description of Q-learning is &ldquo;learning by doing&rdquo;. It makes use of simulation to iterate on the equation. This affects both which $(x,a)$ pairs are updated at each iteration and how they are updated.</p>
+<p>We can break down this approach into two elements: asynchronous updating and stochastic iteration</p>
+<hr>
+<h3 id="asynchronous-and-stochastic-update-path">Asynchronous (and stochastic) update path</h3>
+<p>Whereas  Rust (1987) updates every $(x,a)$ at every iteration, the basic Q-learning iteration only updates a single $(x,a)$ per iteration. The choice of $(x,a)$ is determined by simulation, so $y$ is chosen according to the current policy, while the new $x$ is then chosen according to the transition probabilities.</p>
+<h4 id="algorithm-1">Algorithm</h4>
+<blockquote>
+<p>Denote the current iteration by $k$. Initialize $k=0$, $x^0$, $Q^0$</p>
+<p>For every $k=0,1,\dots, K$:</p>
+<ul>
+<li>$a^k = \arg \max Q^k_(x^k,a)$</li>
+<li>Draw $x^{k+1}$ according to $p(x^{k+1}|x^k,a)$</li>
+<li>Update:</li>
+</ul>
+<blockquote>
+<ul>
+<li>If $(x,a) = (x^k,a^k)$: $Q^{k+1}(x,a) = u(x,a) + \beta \sum_{x \in \mathcal{X}} p(x&rsquo;|x,a) \arg \max_{y \in \mathcal{Y}(x)} Q^k(x&rsquo;,a)$</li>
+<li>Otherwise: $Q^{k+1}_{xy} = Q^k(x,a)$</li>
+</ul>
+</blockquote>
+<ul>
+<li>Non-standard: check for convergence by keeping a running history of the size of function updates</li>
+</ul>
+</blockquote>
+<p><strong>Key point</strong>: note that, in contrast to the previous solution, the update is only performed at one point in $(x,a)$ space at every iteration. In principle, this leads to a more efficient use of information, since the update of one $(x,a)$ pair can immediately be used in the update of another $(x&rsquo;,a&rsquo;)$ pair instead of using &lsquo;outdated&rsquo; information. This is a general feature of asynchronous iterative methods and usually comes at the cost of reduced parallelizability.</p>
+<h3 id="1st-issue-exploration">1st issue: Exploration</h3>
+<p>Picking $a^k = \arg \max Q^k(x^k,a)$ has the advantage of naturally improving our estimate of $Q$ at the points that occurr most frequently in reality.</p>
+<p>However, in the beginning, our guess for $Q$ may be off substantially, and we may fail to pick a $\tilde{a}$ because the current guess for $Q(x,\tilde{a})$ is too low. Since we never pick it, the value can never be updated, and the iteration gets stuck in a suboptimal path.</p>
+<p>To fix this, we need to incoporate some form of <strong>exploration</strong>.</p>
+<p>The simplest form of this is to pick $a^k$ according to the <strong>$\epsilon$-greedy</strong> policy:</p>
+<ul>
+<li>With probability $1-\epsilon$: $a^k = \arg \max Q^k(x^k,a)$</li>
+<li>With probability $\epsilon$: pick $a^k$ randomly</li>
+</ul>
+<p>Depending on the transition matrix, some <strong>exploration in terms of the state space</strong> $\mathcal{X}$ may also be needed. This is apparent in the bus engine replacement problem, since higher-mileages can only be observed after passing through the lower mileages, so estimates at these states can be very noisy. A simple way to accomplish this is by periodically resetting the state variable randomly.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#75715e"># Asynchronous updating component of Q-learning</span>
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">@torch</span><span style="color:#f92672">.</span>jit<span style="color:#f92672">.</span>script
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">Q_learn0_script</span>(U, P, β:float, nbX:int, nbA:int, Q_init, x_init, eps:float, tol:float, buffer_size:int, max_iter:float <span style="color:#f92672">=</span> float(<span style="color:#e6db74">&#39;inf&#39;</span>), reset_freq:float <span style="color:#f92672">=</span> float(<span style="color:#e6db74">&#39;inf&#39;</span>)):
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e"># Initialize</span>
+</span></span><span style="display:flex;"><span>    Q_k <span style="color:#f92672">=</span> Q_init<span style="color:#f92672">.</span>clone()
+</span></span><span style="display:flex;"><span>    x_k <span style="color:#f92672">=</span> x_init
+</span></span><span style="display:flex;"><span>    a_k <span style="color:#f92672">=</span> Q_k[x_k]<span style="color:#f92672">.</span>argmax()
+</span></span><span style="display:flex;"><span>    k <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>
+</span></span><span style="display:flex;"><span>    diff_buffer <span style="color:#f92672">=</span> torch<span style="color:#f92672">.</span>ones(buffer_size)<span style="color:#f92672">*</span>tol
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">while</span> (torch<span style="color:#f92672">.</span>norm(diff_buffer) <span style="color:#f92672">&gt;</span> tol) <span style="color:#f92672">and</span> (k <span style="color:#f92672">&lt;</span> max_iter):
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># epsilon-greedy choice of a</span>
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">if</span> torch<span style="color:#f92672">.</span>rand(<span style="color:#ae81ff">1</span>) <span style="color:#f92672">&gt;</span> eps:
+</span></span><span style="display:flex;"><span>            a_k <span style="color:#f92672">=</span> Q_k[x_k]<span style="color:#f92672">.</span>argmax()
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">else</span>:
+</span></span><span style="display:flex;"><span>            a_k <span style="color:#f92672">=</span> torch<span style="color:#f92672">.</span>randint(nbA, (<span style="color:#ae81ff">1</span>,))[<span style="color:#ae81ff">0</span>]<span style="color:#f92672">.</span>long()
+</span></span><span style="display:flex;"><span>        
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># Calculate the temporal difference and add to buffer</span>
+</span></span><span style="display:flex;"><span>        TD <span style="color:#f92672">=</span> U[x_k,a_k] <span style="color:#f92672">+</span> β <span style="color:#f92672">*</span> torch<span style="color:#f92672">.</span>sum(P[:,x_k,a_k] <span style="color:#f92672">*</span> Q_k<span style="color:#f92672">.</span>max(<span style="color:#ae81ff">1</span>)[<span style="color:#ae81ff">0</span>]) <span style="color:#f92672">-</span> Q_k[x_k,a_k]
+</span></span><span style="display:flex;"><span>        diff_buffer[k <span style="color:#f92672">%</span> buffer_size] <span style="color:#f92672">=</span> TD
+</span></span><span style="display:flex;"><span>        
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># Update Q</span>
+</span></span><span style="display:flex;"><span>        Q_k[x_k,a_k] <span style="color:#f92672">+=</span> TD
+</span></span><span style="display:flex;"><span>        
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># Update x, possibly randomly</span>
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">if</span> k <span style="color:#f92672">%</span> reset_freq <span style="color:#f92672">==</span> <span style="color:#ae81ff">0</span>:
+</span></span><span style="display:flex;"><span>            x_k <span style="color:#f92672">=</span> torch<span style="color:#f92672">.</span>randint(nbX,(<span style="color:#ae81ff">1</span>,))[<span style="color:#ae81ff">0</span>]<span style="color:#f92672">.</span>long()
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">else</span>:
+</span></span><span style="display:flex;"><span>            x_k <span style="color:#f92672">=</span> torch<span style="color:#f92672">.</span>multinomial(P[:,x_k,a_k],<span style="color:#ae81ff">1</span>)[<span style="color:#ae81ff">0</span>]
+</span></span><span style="display:flex;"><span>            
+</span></span><span style="display:flex;"><span>        k <span style="color:#f92672">+=</span> <span style="color:#ae81ff">1</span>
+</span></span><span style="display:flex;"><span>    
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span> Q_k, diff_buffer, k
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">Q_learn0</span>(self, Q_init, x_init, eps:float, tol:float, buffer_size:int, max_iter <span style="color:#f92672">=</span> float(<span style="color:#e6db74">&#39;inf&#39;</span>), reset_freq:float <span style="color:#f92672">=</span> float(<span style="color:#e6db74">&#39;inf&#39;</span>)):
+</span></span><span style="display:flex;"><span>    Q_k, diff_buffer, k <span style="color:#f92672">=</span> Q_learn0_script(self<span style="color:#f92672">.</span>u, self<span style="color:#f92672">.</span>P, self<span style="color:#f92672">.</span>β, self<span style="color:#f92672">.</span>nbX, self<span style="color:#f92672">.</span>nbA, Q_init, x_init, eps, tol, buffer_size, max_iter, reset_freq)
+</span></span><span style="display:flex;"><span>    
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">if</span> torch<span style="color:#f92672">.</span>norm(diff_buffer) <span style="color:#f92672">&lt;=</span> tol:
+</span></span><span style="display:flex;"><span>        print(<span style="color:#e6db74">&#34;Iteration converged after &#34;</span> <span style="color:#f92672">+</span> <span style="color:#e6db74">&#34;</span><span style="color:#e6db74">{:,}</span><span style="color:#e6db74">&#34;</span><span style="color:#f92672">.</span>format(k) <span style="color:#f92672">+</span> <span style="color:#e6db74">&#34; function updates&#34;</span>)
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">else</span>:
+</span></span><span style="display:flex;"><span>        print(<span style="color:#e6db74">&#34;Hit maximum iterations after &#34;</span> <span style="color:#f92672">+</span> <span style="color:#e6db74">&#34;</span><span style="color:#e6db74">{:,}</span><span style="color:#e6db74">&#34;</span><span style="color:#f92672">.</span>format(k) <span style="color:#f92672">+</span> <span style="color:#e6db74">&#34; function updates&#34;</span>)   
+</span></span><span style="display:flex;"><span>    
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span> Q_k, diff_buffer
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>dynamic_problem<span style="color:#f92672">.</span>Q_learn0 <span style="color:#f92672">=</span> Q_learn0
+</span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#75715e"># Reasonable training parameters</span>
+</span></span><span style="display:flex;"><span>x_init <span style="color:#f92672">=</span> torch<span style="color:#f92672">.</span>tensor(<span style="color:#ae81ff">0</span>)
+</span></span><span style="display:flex;"><span>eps <span style="color:#f92672">=</span> <span style="color:#ae81ff">0.02</span>
+</span></span><span style="display:flex;"><span>tol <span style="color:#f92672">=</span> <span style="color:#ae81ff">1e-8</span>
+</span></span><span style="display:flex;"><span>buffer_size <span style="color:#f92672">=</span> bus_problem<span style="color:#f92672">.</span>nbX<span style="color:#f92672">*</span>bus_problem<span style="color:#f92672">.</span>nbA
+</span></span><span style="display:flex;"><span>max_iter <span style="color:#f92672">=</span> <span style="color:#ae81ff">300000</span>
+</span></span><span style="display:flex;"><span>reset_freq <span style="color:#f92672">=</span> <span style="color:#ae81ff">20</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#f92672">%</span>time Q_sol_learn0, diff_buffer_learn0 <span style="color:#f92672">=</span> bus_problem<span style="color:#f92672">.</span>Q_learn0(Q_init, x_init, eps, tol, buffer_size, max_iter, reset_freq)
+</span></span></code></pre></div><pre><code>Iteration converged after 175,597 function updates
+CPU times: user 1min, sys: 36.5 s, total: 1min 36s
+Wall time: 14.1 s
+</code></pre>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#75715e"># Plots</span>
+</span></span><span style="display:flex;"><span>axs[<span style="color:#ae81ff">0</span>]<span style="color:#f92672">.</span>plot(x_grid, Q_sol_learn0[:,<span style="color:#ae81ff">1</span>]<span style="color:#f92672">-</span>Q_sol_learn0[:,<span style="color:#ae81ff">0</span>], label <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;Asynchronous updating&#34;</span>)
+</span></span><span style="display:flex;"><span>axs[<span style="color:#ae81ff">0</span>]<span style="color:#f92672">.</span>legend()
+</span></span><span style="display:flex;"><span>axs[<span style="color:#ae81ff">1</span>]<span style="color:#f92672">.</span>plot(x_grid, Q_sol_learn0[:,<span style="color:#ae81ff">1</span>]<span style="color:#f92672">-</span>Q_sol_learn0[:,<span style="color:#ae81ff">0</span>] <span style="color:#f92672">&gt;</span> <span style="color:#ae81ff">0</span>, label <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;Asynchronous updating&#34;</span>)
+</span></span><span style="display:flex;"><span>axs[<span style="color:#ae81ff">1</span>]<span style="color:#f92672">.</span>legend()
+</span></span><span style="display:flex;"><span>fig
+</span></span></code></pre></div><p><img src="output_15_0.png" alt="png"></p>
+<h4 id="solution-comparison">Solution comparison</h4>
+<p>Comparing the solution with the benchmark, we see that the solution generally matches very well, except for a few points. This demonstrates the stochastic nature of the update process and the consequent difficulty of verifying convergence.</p>
+<p>Furthermore, notice that the total number of function updates is comparable to the synchronous and parallel update method, while being much slower due to lack of parallelization and general overhead from executing a loop.</p>
+<p>The lackluster improvement in terms of the number of function updates has partly to do with the nature of the problem, which results in heavily skewed sampling of the $(x,a)$ space.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#75715e"># Randomly pick a state every time</span>
+</span></span><span style="display:flex;"><span><span style="color:#f92672">%</span>time _ <span style="color:#f92672">=</span> bus_problem<span style="color:#f92672">.</span>Q_learn0(Q_init, x_init, <span style="color:#ae81ff">0.05</span>, tol, buffer_size, max_iter, reset_freq <span style="color:#f92672">=</span> <span style="color:#ae81ff">1</span>);
+</span></span></code></pre></div><pre><code>Iteration converged after 112,803 function updates
+CPU times: user 21.3 s, sys: 11.3 s, total: 32.6 s
+Wall time: 4.42 s
+</code></pre>
+<p>Here, we re-run the algorithm but set the reset frequency to 1, such that the state $x$ is randomized at every iteration, yields a much stronger improvement in the number of function updates required.</p>
+<hr>
+<h3 id="stochastic-iteration">Stochastic iteration</h3>
+<p>Now reconsider the term: $p(x&rsquo;|x,a) \arg \max_{y \in \mathcal{Y}(x)} Q^k_{x&rsquo;y}$. In some cases, this can be very expensive to compute, in particular when the transition probabilities $p(x&rsquo;|x,a)$ are intractable or take on a complex form.</p>
+<p>Recall that we are already drawing the next state $x^{k+1}$ from $p(x&rsquo;|x,a)$ anyways. We can use this to get a very noisy estimate of the above expectation, and use averaging over many periods to smooth out the noise, sing the same principle as <strong>stochastic optimization</strong>.</p>
+<p>Essentially, when we visit $(x^k,a^k)$ in iteration $k$ and get a draw of the following state $x^{k+1}$, this gives a noisy estimate of $Q(x^k,a^k)$:</p>
+<p>$$\tilde{Q}(x^k,a^k) = u(x^k,a^k) + \beta \arg \max_{a&rsquo;} Q^k(x^{k+1},a&rsquo;)$$</p>
+<p>Because this estimate is noisy, we want to average it over multiple visits of $(x,a)$, so we do not fully update $Q$ to the new value.</p>
+<h4 id="algorithm-2">Algorithm</h4>
+<blockquote>
+<p>Initialize $k=0$, $x^0$, $Q^0$.</p>
+<p>For every $k=0,1,\dots$:</p>
+<ul>
+<li>$a^k = \arg \max Q^k(x^k,a)$</li>
+<li>Draw $x^{k+1}$ according to $p(x&rsquo;|x^k,a^k)$</li>
+<li>Get the target value: $\tilde{Q}(x^k,a^k) = u(x^k,a^k) + \beta \arg \max_{a&rsquo;} Q^k(x^{k+1},a&rsquo;)$</li>
+<li>Update:</li>
+</ul>
+<blockquote>
+<ul>
+<li>$Q^{k+1}(x,a) = Q^{k}(x,a) + \alpha^k (\tilde{Q}(x^k,a^k) - Q^k(x,a))$ if $(x,a) = (x^k,a^k)$</li>
+<li>$Q^{k+1}(x,a) = Q^k(x,a)$ otherwise</li>
+</ul>
+</blockquote>
+</blockquote>
+<p><strong>Key point</strong>: note that the updates do not require integrating over the future possible states $x&rsquo;$. In this example with a pre-computed Markov transition matrix and a small state space, this provides little to no advantage. However, in situations with a very large state space and expensive to compute transition probabilities, this can be a significant advantage.</p>
+<h3 id="2nd-issue-convergence">2nd issue: Convergence</h3>
+<p>With the new form of updating, we no longer have the convergence guarantees of the contraction mapping.</p>
+<p>Instead, $Q^k$ will behave more like a random variable. If $\alpha^k$ is held fixed, it will never completely converge, only bounce around in the neighborhood of the true $Q$.</p>
+<p>However, there are conditions on the sequence of $\alpha^k$ which should guarantee convergence:</p>
+<ol>
+<li>$\sum_{k=0}^\infty \alpha^k = \infty$</li>
+<li>$\sum_{k=0}^\infty \alpha^k &lt; \infty$</li>
+</ol>
+<blockquote>
+<p>Sutton and Barto (2020), p.33</p>
+</blockquote>
+<p>In practice, these conditions are not strictly observed, particularly because they can lead to very slow convergence rates. However, for econometric applications, guaranteed convergence may be more important.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#75715e"># Full Q-learning</span>
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">@torch</span><span style="color:#f92672">.</span>jit<span style="color:#f92672">.</span>script
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">Q_learn1_script</span>(U, P, β:float, nbX:int, nbA:int, Q_init, x_init, α_k:float, eps:float, tol:float, buffer_size:int, max_iter:float <span style="color:#f92672">=</span> float(<span style="color:#e6db74">&#39;inf&#39;</span>), reset_freq:float <span style="color:#f92672">=</span> float(<span style="color:#e6db74">&#39;inf&#39;</span>)):
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e"># Initialize</span>
+</span></span><span style="display:flex;"><span>    Q_k <span style="color:#f92672">=</span> Q_init<span style="color:#f92672">.</span>clone()
+</span></span><span style="display:flex;"><span>    x_k <span style="color:#f92672">=</span> x_init
+</span></span><span style="display:flex;"><span>    a_k <span style="color:#f92672">=</span> Q_k[x_k]<span style="color:#f92672">.</span>argmax()
+</span></span><span style="display:flex;"><span>    k <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>
+</span></span><span style="display:flex;"><span>    diff_buffer <span style="color:#f92672">=</span> torch<span style="color:#f92672">.</span>ones(buffer_size)<span style="color:#f92672">*</span>tol <span style="color:#f92672">+</span> <span style="color:#ae81ff">1</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">while</span> (torch<span style="color:#f92672">.</span>abs(torch<span style="color:#f92672">.</span>mean(diff_buffer)) <span style="color:#f92672">&gt;</span> tol) <span style="color:#f92672">and</span> (k <span style="color:#f92672">&lt;</span> max_iter):
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># epsilon-greedy choice of y</span>
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">if</span> torch<span style="color:#f92672">.</span>rand(<span style="color:#ae81ff">1</span>) <span style="color:#f92672">&gt;</span> eps:
+</span></span><span style="display:flex;"><span>            a_k <span style="color:#f92672">=</span> Q_k[x_k]<span style="color:#f92672">.</span>argmax()
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">else</span>:
+</span></span><span style="display:flex;"><span>            a_k <span style="color:#f92672">=</span> torch<span style="color:#f92672">.</span>randint(nbA, (<span style="color:#ae81ff">1</span>,))[<span style="color:#ae81ff">0</span>]<span style="color:#f92672">.</span>long()
+</span></span><span style="display:flex;"><span>        
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># draw next x</span>
+</span></span><span style="display:flex;"><span>        x_k1 <span style="color:#f92672">=</span> torch<span style="color:#f92672">.</span>multinomial(P[:,x_k,a_k],<span style="color:#ae81ff">1</span>)[<span style="color:#ae81ff">0</span>]
+</span></span><span style="display:flex;"><span>        
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># Calculate the temporal difference and add to buffer</span>
+</span></span><span style="display:flex;"><span>        TD <span style="color:#f92672">=</span> U[x_k,a_k] <span style="color:#f92672">+</span> β <span style="color:#f92672">*</span> Q_k[x_k1]<span style="color:#f92672">.</span>max() <span style="color:#f92672">-</span> Q_k[x_k,a_k]
+</span></span><span style="display:flex;"><span>        diff_buffer[k <span style="color:#f92672">%</span> buffer_size] <span style="color:#f92672">=</span> TD
+</span></span><span style="display:flex;"><span>        
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># Update Q</span>
+</span></span><span style="display:flex;"><span>        Q_k[x_k,a_k] <span style="color:#f92672">+=</span> α_k <span style="color:#f92672">*</span> TD
+</span></span><span style="display:flex;"><span>        
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># Update x, possibly randomly</span>
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">if</span> k <span style="color:#f92672">%</span> reset_freq <span style="color:#f92672">==</span> <span style="color:#ae81ff">0</span>:
+</span></span><span style="display:flex;"><span>            x_k <span style="color:#f92672">=</span> torch<span style="color:#f92672">.</span>randint(nbX,(<span style="color:#ae81ff">1</span>,))[<span style="color:#ae81ff">0</span>]<span style="color:#f92672">.</span>long()
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">else</span>:
+</span></span><span style="display:flex;"><span>            x_k <span style="color:#f92672">=</span> x_k1        
+</span></span><span style="display:flex;"><span>            
+</span></span><span style="display:flex;"><span>        k <span style="color:#f92672">+=</span> <span style="color:#ae81ff">1</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span> Q_k, diff_buffer, k
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">Q_learn1</span>(self, Q_init, x_init, α_k:float, eps:float, tol:float, buffer_size:int, max_iter <span style="color:#f92672">=</span> float(<span style="color:#e6db74">&#39;inf&#39;</span>), reset_freq:float <span style="color:#f92672">=</span> float(<span style="color:#e6db74">&#39;inf&#39;</span>)):
+</span></span><span style="display:flex;"><span>    Q_k, diff_buffer, k <span style="color:#f92672">=</span> Q_learn1_script(self<span style="color:#f92672">.</span>u, self<span style="color:#f92672">.</span>P, self<span style="color:#f92672">.</span>β, self<span style="color:#f92672">.</span>nbX, self<span style="color:#f92672">.</span>nbA, Q_init, x_init, α_k, eps, tol, buffer_size, max_iter, reset_freq)
+</span></span><span style="display:flex;"><span>    
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">if</span> torch<span style="color:#f92672">.</span>norm(diff_buffer) <span style="color:#f92672">&lt;=</span> tol:
+</span></span><span style="display:flex;"><span>        print(<span style="color:#e6db74">&#34;Iteration converged after &#34;</span> <span style="color:#f92672">+</span> <span style="color:#e6db74">&#34;</span><span style="color:#e6db74">{:,}</span><span style="color:#e6db74">&#34;</span><span style="color:#f92672">.</span>format(k) <span style="color:#f92672">+</span> <span style="color:#e6db74">&#34; function updates&#34;</span>)
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">else</span>:
+</span></span><span style="display:flex;"><span>        print(<span style="color:#e6db74">&#34;Hit maximum iterations after &#34;</span> <span style="color:#f92672">+</span> <span style="color:#e6db74">&#34;</span><span style="color:#e6db74">{:,}</span><span style="color:#e6db74">&#34;</span><span style="color:#f92672">.</span>format(k) <span style="color:#f92672">+</span> <span style="color:#e6db74">&#34; function updates&#34;</span>)   
+</span></span><span style="display:flex;"><span>    
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span> Q_k, diff_buffer
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>dynamic_problem<span style="color:#f92672">.</span>Q_learn1 <span style="color:#f92672">=</span> Q_learn1
+</span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span>x_init <span style="color:#f92672">=</span> torch<span style="color:#f92672">.</span>tensor(<span style="color:#ae81ff">0</span>)
+</span></span><span style="display:flex;"><span>α_k <span style="color:#f92672">=</span> <span style="color:#ae81ff">0.1</span>
+</span></span><span style="display:flex;"><span>eps <span style="color:#f92672">=</span> <span style="color:#ae81ff">0.04</span>
+</span></span><span style="display:flex;"><span>tol <span style="color:#f92672">=</span> <span style="color:#ae81ff">1e-8</span>
+</span></span><span style="display:flex;"><span>buffer_size <span style="color:#f92672">=</span> bus_problem<span style="color:#f92672">.</span>nbX<span style="color:#f92672">*</span>bus_problem<span style="color:#f92672">.</span>nbA
+</span></span><span style="display:flex;"><span>max_iter <span style="color:#f92672">=</span> <span style="color:#ae81ff">1000000</span>
+</span></span><span style="display:flex;"><span>reset_freq <span style="color:#f92672">=</span> <span style="color:#ae81ff">20</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#f92672">%</span>time Q_sol_learn1, diff_buffer_learn1 <span style="color:#f92672">=</span> bus_problem<span style="color:#f92672">.</span>Q_learn1(Q_init, x_init, α_k, eps, tol, buffer_size, max_iter, reset_freq)
+</span></span></code></pre></div><pre><code>Hit maximum iterations after 852,508 function updates
+CPU times: user 44.2 s, sys: 566 ms, total: 44.7 s
+Wall time: 43.8 s
+</code></pre>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#75715e"># Plot</span>
+</span></span><span style="display:flex;"><span>axs[<span style="color:#ae81ff">0</span>]<span style="color:#f92672">.</span>lines<span style="color:#f92672">.</span>pop()
+</span></span><span style="display:flex;"><span>axs[<span style="color:#ae81ff">0</span>]<span style="color:#f92672">.</span>plot(x_grid, Q_sol_learn1[:,<span style="color:#ae81ff">1</span>]<span style="color:#f92672">-</span>Q_sol_learn1[:,<span style="color:#ae81ff">0</span>], label <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;Q-learning&#34;</span>)
+</span></span><span style="display:flex;"><span>axs[<span style="color:#ae81ff">0</span>]<span style="color:#f92672">.</span>legend()
+</span></span><span style="display:flex;"><span>axs[<span style="color:#ae81ff">1</span>]<span style="color:#f92672">.</span>lines<span style="color:#f92672">.</span>pop()
+</span></span><span style="display:flex;"><span>axs[<span style="color:#ae81ff">1</span>]<span style="color:#f92672">.</span>plot(x_grid, Q_sol_learn1[:,<span style="color:#ae81ff">1</span>]<span style="color:#f92672">-</span>Q_sol_learn1[:,<span style="color:#ae81ff">0</span>] <span style="color:#f92672">&gt;</span> <span style="color:#ae81ff">0</span>, label <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;Q-learning&#34;</span>)
+</span></span><span style="display:flex;"><span>axs[<span style="color:#ae81ff">1</span>]<span style="color:#f92672">.</span>legend()
+</span></span><span style="display:flex;"><span>fig
+</span></span></code></pre></div><p><img src="output_23_0.png" alt="png"></p>
+<h4 id="solution-comparison-1">Solution comparison</h4>
+<p>We can see here that the computed Q-functions approximate the benchmark fairly closely, though the noise due to stochastic iteration is apparent, even leading to an incorrect policy function in some states.</p>
+<p>However, one should also note that this was accomplished with roughly 5 times as many updates, even though we were previously integrating over a state space of $|\mathcal{X}| = 201$. In cases where the computation of transition probabilities is the main computational burden, this represents a speedup factor of roughly 40!</p>
+<hr>
+<h1 id="deep-q-learning">Deep Q-learning</h1>
+<p>So far, the algorithms presented use a large table to represent the Q-values (they are all <strong>tabular</strong> algorithms). In cases with large state and actions spaces, this implies that (a) a large table is needed to store the values (poor scaling in space complexity) and (b) a large number of updates is needed to reach convergence everywhere.</p>
+<p><img src="https://spectrum.ieee.org/media-library/a-structure-of-lines-connecting-dots.png?id=27528385&amp;width=605&amp;quality=80" alt="What a deep neural net looks like"></p>
+<p>The recent breakthroughs linked at the beginning of this notebook were only made possible by combining Q-learning with state of the art <strong>deep neural networks</strong>, which can represent the Q-values much more sparsely and are generally flexible enough to approximate whatever underlying structure the Q-values have.</p>
+<p>In general, any universal function approximator will work, as we typically expect the Q-values to be smooth enough in $(x,a)$ such that neighboring pairs will have similar Q-values. Using a function approximator will then also speed up convergence, since a single update can affect a larger region of the $(x,a)$ space.</p>
+<p>Finally, the use of such an approximation also allows one to dispense with the discretization of a continuous state space.</p>
+<p>In the following, let $Q^\theta$ denote an approximation to $Q$ parametrized by $\theta$.</p>
+<h4 id="algorithm-3">Algorithm</h4>
+<blockquote>
+<p>Initialize $k=0$, $x^0$, $\theta^0$.</p>
+<p>For every $k=0,1,\dots$:</p>
+<ul>
+<li>$a^k = \arg \max Q^{\theta^k}(x^k,a)$</li>
+<li>Draw $x^{k+1}$ according to $p(x&rsquo;|x^k,a^k)$</li>
+<li>Get the target value: $\tilde{Q}^k = u(x^k,a^k) + \beta \arg \max_{a&rsquo;} Q^{\theta^k}(x^{k+1},a&rsquo;) $</li>
+<li>Update:</li>
+</ul>
+<blockquote>
+<ul>
+<li>$\theta^{k+1} = \theta^k + \alpha^k \nabla_\theta \big( \tilde{Q}^k - Q^{\theta^k}(x^k,a^k) \big)$</li>
+</ul>
+</blockquote>
+</blockquote>
+<p><strong>Notice</strong>: the update step corresponds to gradient descent of the problem: $\arg \min_\theta \big(\tilde{Q}^k - Q^{\theta^k}_{x^ka^k}\big)^2 $</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#75715e"># Defining the neural network structure. </span>
+</span></span><span style="display:flex;"><span><span style="color:#f92672">from</span> torch <span style="color:#f92672">import</span> nn
+</span></span><span style="display:flex;"><span><span style="color:#f92672">import</span> torch.nn.functional <span style="color:#66d9ef">as</span> F
+</span></span><span style="display:flex;"><span><span style="color:#f92672">from</span> torch <span style="color:#f92672">import</span> optim
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">class</span> <span style="color:#a6e22e">Fork_Net</span>(nn<span style="color:#f92672">.</span>Module):
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">def</span> __init__(self, L1_size, L2_size, rescale_factor):
+</span></span><span style="display:flex;"><span>        super(Fork_Net, self)<span style="color:#f92672">.</span>__init__()
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>fc11 <span style="color:#f92672">=</span> nn<span style="color:#f92672">.</span>Linear(<span style="color:#ae81ff">1</span>, L1_size)
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>fc12 <span style="color:#f92672">=</span> nn<span style="color:#f92672">.</span>Linear(L1_size, L2_size)
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>fc13 <span style="color:#f92672">=</span> nn<span style="color:#f92672">.</span>Linear(L2_size, <span style="color:#ae81ff">1</span>)
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>fc21 <span style="color:#f92672">=</span> nn<span style="color:#f92672">.</span>Linear(<span style="color:#ae81ff">1</span>, L1_size)
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>fc22 <span style="color:#f92672">=</span> nn<span style="color:#f92672">.</span>Linear(L1_size, L2_size)
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>fc23 <span style="color:#f92672">=</span> nn<span style="color:#f92672">.</span>Linear(L2_size, <span style="color:#ae81ff">1</span>)
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>rescale_factor <span style="color:#f92672">=</span> rescale_factor
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">forward</span>(self, X):
+</span></span><span style="display:flex;"><span>        x1 <span style="color:#f92672">=</span> F<span style="color:#f92672">.</span>relu(self<span style="color:#f92672">.</span>fc11(X<span style="color:#f92672">*</span>self<span style="color:#f92672">.</span>rescale_factor))
+</span></span><span style="display:flex;"><span>        x1 <span style="color:#f92672">=</span> F<span style="color:#f92672">.</span>relu(self<span style="color:#f92672">.</span>fc12(x1))
+</span></span><span style="display:flex;"><span>        x1 <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>fc13(x1)
+</span></span><span style="display:flex;"><span>        x2 <span style="color:#f92672">=</span> F<span style="color:#f92672">.</span>relu(self<span style="color:#f92672">.</span>fc21(X<span style="color:#f92672">*</span>self<span style="color:#f92672">.</span>rescale_factor))
+</span></span><span style="display:flex;"><span>        x2 <span style="color:#f92672">=</span> F<span style="color:#f92672">.</span>relu(self<span style="color:#f92672">.</span>fc22(x2))
+</span></span><span style="display:flex;"><span>        x2 <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>fc23(x2)
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">return</span> torch<span style="color:#f92672">.</span>cat([x1,x2], <span style="color:#f92672">-</span><span style="color:#ae81ff">1</span>)
+</span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">deep_Q_learn</span>(self, Q_net, x_init, α_k:float, eps:float, tol:float, buffer_size:int, max_iter:float <span style="color:#f92672">=</span> float(<span style="color:#e6db74">&#39;inf&#39;</span>), reset_freq:float <span style="color:#f92672">=</span> float(<span style="color:#e6db74">&#39;inf&#39;</span>), batch_size <span style="color:#f92672">=</span> <span style="color:#ae81ff">1</span>):
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e"># Initialize</span>
+</span></span><span style="display:flex;"><span>    opt_Q <span style="color:#f92672">=</span> optim<span style="color:#f92672">.</span>Adam(Q_net<span style="color:#f92672">.</span>parameters(), lr<span style="color:#f92672">=</span>α_k)
+</span></span><span style="display:flex;"><span>    x_k <span style="color:#f92672">=</span> torch<span style="color:#f92672">.</span>tensor([x_init])
+</span></span><span style="display:flex;"><span>    a_k <span style="color:#f92672">=</span> Q_net(self<span style="color:#f92672">.</span>x_grid[x_k])<span style="color:#f92672">.</span>argmax()
+</span></span><span style="display:flex;"><span>    k <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>
+</span></span><span style="display:flex;"><span>    diff_buffer <span style="color:#f92672">=</span> torch<span style="color:#f92672">.</span>ones(buffer_size)<span style="color:#f92672">*</span>tol <span style="color:#f92672">+</span> <span style="color:#ae81ff">1</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">while</span> (torch<span style="color:#f92672">.</span>mean(diff_buffer) <span style="color:#f92672">&gt;</span> tol) <span style="color:#f92672">and</span> (k <span style="color:#f92672">&lt;</span> max_iter):
+</span></span><span style="display:flex;"><span>        obj <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>
+</span></span><span style="display:flex;"><span>        
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">for</span> j <span style="color:#f92672">in</span> range(batch_size):
+</span></span><span style="display:flex;"><span>            <span style="color:#75715e"># epsilon-greedy choice of y</span>
+</span></span><span style="display:flex;"><span>            <span style="color:#66d9ef">if</span> random<span style="color:#f92672">.</span>random() <span style="color:#f92672">&gt;</span> eps:
+</span></span><span style="display:flex;"><span>                a_k <span style="color:#f92672">=</span> Q_net(self<span style="color:#f92672">.</span>x_grid[x_k])<span style="color:#f92672">.</span>argmax()
+</span></span><span style="display:flex;"><span>            <span style="color:#66d9ef">else</span>:
+</span></span><span style="display:flex;"><span>                a_k <span style="color:#f92672">=</span> random<span style="color:#f92672">.</span>randint(<span style="color:#ae81ff">0</span>,<span style="color:#ae81ff">1</span>)
+</span></span><span style="display:flex;"><span>                
+</span></span><span style="display:flex;"><span>            <span style="color:#75715e"># draw next x</span>
+</span></span><span style="display:flex;"><span>            x_k1 <span style="color:#f92672">=</span> torch<span style="color:#f92672">.</span>multinomial(self<span style="color:#f92672">.</span>P[:,x_k[<span style="color:#ae81ff">0</span>],a_k],<span style="color:#ae81ff">1</span>)
+</span></span><span style="display:flex;"><span>            
+</span></span><span style="display:flex;"><span>            <span style="color:#75715e"># Calculate the temporal difference and add to objective</span>
+</span></span><span style="display:flex;"><span>            TD <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>u[x_k, a_k] <span style="color:#f92672">+</span> self<span style="color:#f92672">.</span>β <span style="color:#f92672">*</span> Q_net(self<span style="color:#f92672">.</span>x_grid[x_k1])<span style="color:#f92672">.</span>max()<span style="color:#f92672">.</span>detach() <span style="color:#f92672">-</span> Q_net(self<span style="color:#f92672">.</span>x_grid[x_k])[a_k] <span style="color:#75715e"># detach is used so that the gradient is not computed wrt to this term</span>
+</span></span><span style="display:flex;"><span>            obj <span style="color:#f92672">+=</span> (TD<span style="color:#f92672">**</span><span style="color:#ae81ff">2</span>)<span style="color:#f92672">/</span><span style="color:#ae81ff">2</span>
+</span></span><span style="display:flex;"><span>        
+</span></span><span style="display:flex;"><span>            <span style="color:#75715e"># Update x, possibly randomly</span>
+</span></span><span style="display:flex;"><span>            <span style="color:#66d9ef">if</span> (j <span style="color:#f92672">+</span> k<span style="color:#f92672">*</span>batch_size) <span style="color:#f92672">%</span> reset_freq <span style="color:#f92672">==</span> <span style="color:#ae81ff">0</span>:
+</span></span><span style="display:flex;"><span>                <span style="color:#75715e"># x_k = self.x_grid[random.randint(0,self.nbX-1)].unsqueeze(0) * 1.5</span>
+</span></span><span style="display:flex;"><span>                x_k <span style="color:#f92672">=</span> torch<span style="color:#f92672">.</span>tensor([random<span style="color:#f92672">.</span>randint(<span style="color:#ae81ff">0</span>,self<span style="color:#f92672">.</span>nbX<span style="color:#f92672">-</span><span style="color:#ae81ff">1</span>)])
+</span></span><span style="display:flex;"><span>            <span style="color:#66d9ef">else</span>:
+</span></span><span style="display:flex;"><span>                x_k <span style="color:#f92672">=</span> x_k1
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        diff_buffer[k <span style="color:#f92672">%</span> buffer_size] <span style="color:#f92672">=</span> obj[<span style="color:#ae81ff">0</span>]<span style="color:#f92672">/</span>batch_size
+</span></span><span style="display:flex;"><span>            
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># Update network parameters</span>
+</span></span><span style="display:flex;"><span>        opt_Q<span style="color:#f92672">.</span>zero_grad()
+</span></span><span style="display:flex;"><span>        (obj<span style="color:#f92672">/</span>batch_size)<span style="color:#f92672">.</span>backward()
+</span></span><span style="display:flex;"><span>        opt_Q<span style="color:#f92672">.</span>step()
+</span></span><span style="display:flex;"><span>        
+</span></span><span style="display:flex;"><span>        k <span style="color:#f92672">+=</span> <span style="color:#ae81ff">1</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">if</span> torch<span style="color:#f92672">.</span>norm(diff_buffer) <span style="color:#f92672">&lt;=</span> tol:
+</span></span><span style="display:flex;"><span>        print(<span style="color:#e6db74">&#34;Iteration converged after &#34;</span> <span style="color:#f92672">+</span> <span style="color:#e6db74">&#34;</span><span style="color:#e6db74">{:,}</span><span style="color:#e6db74">&#34;</span><span style="color:#f92672">.</span>format(k<span style="color:#f92672">*</span>batch_size) <span style="color:#f92672">+</span> <span style="color:#e6db74">&#34; function updates&#34;</span>)
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">else</span>:
+</span></span><span style="display:flex;"><span>        print(<span style="color:#e6db74">&#34;Hit maximum iterations after &#34;</span> <span style="color:#f92672">+</span> <span style="color:#e6db74">&#34;</span><span style="color:#e6db74">{:,}</span><span style="color:#e6db74">&#34;</span><span style="color:#f92672">.</span>format(k<span style="color:#f92672">*</span>batch_size) <span style="color:#f92672">+</span> <span style="color:#e6db74">&#34; function updates&#34;</span>)   
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span> Q_net, diff_buffer
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>dynamic_problem<span style="color:#f92672">.</span>deep_Q_learn <span style="color:#f92672">=</span> deep_Q_learn
+</span></span></code></pre></div><h4 id="initial-parameters">Initial parameters</h4>
+<p>The parameters are initialized by the pytorch library. For context, here are the Q-functions given by the initial neural network.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#75715e"># Initialized network</span>
+</span></span><span style="display:flex;"><span>Q_net <span style="color:#f92672">=</span> Fork_Net(<span style="color:#ae81ff">16</span>,<span style="color:#ae81ff">16</span>,<span style="color:#ae81ff">1</span><span style="color:#f92672">/</span><span style="color:#ae81ff">3e5</span>)
+</span></span><span style="display:flex;"><span>plt<span style="color:#f92672">.</span>plot(Q_net(x_grid[:,<span style="color:#66d9ef">None</span>])<span style="color:#f92672">.</span>detach()) 
+</span></span></code></pre></div><pre><code>[&lt;matplotlib.lines.Line2D at 0x140551c60&gt;,
+ &lt;matplotlib.lines.Line2D at 0x140551c00&gt;]
+</code></pre>
+<p><img src="output_30_1.png" alt="png"></p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span>x_init <span style="color:#f92672">=</span> torch<span style="color:#f92672">.</span>tensor(<span style="color:#ae81ff">0</span>)
+</span></span><span style="display:flex;"><span>α_k <span style="color:#f92672">=</span> <span style="color:#ae81ff">5e-2</span>
+</span></span><span style="display:flex;"><span>eps <span style="color:#f92672">=</span> <span style="color:#ae81ff">0.03</span>
+</span></span><span style="display:flex;"><span>tol <span style="color:#f92672">=</span> <span style="color:#ae81ff">1e-8</span>
+</span></span><span style="display:flex;"><span>buffer_size <span style="color:#f92672">=</span> bus_problem<span style="color:#f92672">.</span>nbX<span style="color:#f92672">*</span>bus_problem<span style="color:#f92672">.</span>nbA
+</span></span><span style="display:flex;"><span>max_iter <span style="color:#f92672">=</span> <span style="color:#ae81ff">1500</span>
+</span></span><span style="display:flex;"><span>reset_freq <span style="color:#f92672">=</span> <span style="color:#ae81ff">20</span>
+</span></span><span style="display:flex;"><span>batch_size <span style="color:#f92672">=</span> <span style="color:#ae81ff">20</span>
+</span></span><span style="display:flex;"><span><span style="color:#f92672">%</span>time Q_net, diff_buffer_deep <span style="color:#f92672">=</span> bus_problem<span style="color:#f92672">.</span>deep_Q_learn(Q_net, x_init, α_k, eps, tol, buffer_size, max_iter, reset_freq, batch_size)
+</span></span></code></pre></div><pre><code>Hit maximum iterations after 30,000 function updates
+CPU times: user 8.41 s, sys: 157 ms, total: 8.56 s
+Wall time: 8.28 s
+</code></pre>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span>Q_sol_deep <span style="color:#f92672">=</span> Q_net(x_grid[:,<span style="color:#66d9ef">None</span>])<span style="color:#f92672">.</span>detach()
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># Plot</span>
+</span></span><span style="display:flex;"><span>axs[<span style="color:#ae81ff">0</span>]<span style="color:#f92672">.</span>lines<span style="color:#f92672">.</span>pop()
+</span></span><span style="display:flex;"><span>axs[<span style="color:#ae81ff">0</span>]<span style="color:#f92672">.</span>plot(x_grid, Q_sol_deep[:,<span style="color:#ae81ff">1</span>]<span style="color:#f92672">-</span>Q_sol_deep[:,<span style="color:#ae81ff">0</span>], label <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;Deep Q-learning&#34;</span>)
+</span></span><span style="display:flex;"><span>axs[<span style="color:#ae81ff">0</span>]<span style="color:#f92672">.</span>legend()
+</span></span><span style="display:flex;"><span>axs[<span style="color:#ae81ff">1</span>]<span style="color:#f92672">.</span>lines<span style="color:#f92672">.</span>pop()
+</span></span><span style="display:flex;"><span>axs[<span style="color:#ae81ff">1</span>]<span style="color:#f92672">.</span>plot(x_grid, Q_sol_deep[:,<span style="color:#ae81ff">1</span>]<span style="color:#f92672">-</span>Q_sol_deep[:,<span style="color:#ae81ff">0</span>]<span style="color:#f92672">&gt;</span><span style="color:#ae81ff">0</span>, label <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;Deep Q-learning&#34;</span>)
+</span></span><span style="display:flex;"><span>axs[<span style="color:#ae81ff">1</span>]<span style="color:#f92672">.</span>legend()
+</span></span><span style="display:flex;"><span>fig
+</span></span></code></pre></div><p><img src="output_32_0.png" alt="png"></p>
+<h4 id="solution-comparison-2">Solution comparison</h4>
+<p>We can immediately see that the approximation excessively smooths out the value functions. In principle this can be remedied with a larger number of iterations and smaller step-sizes, at the cost of increased computing time. This essentially echoes the bias-variance trade-off that is found throughout machine learning and non-parametric estimation.</p>
+<p>However, note that even with a clear bias in the value functions, the resulting policy function is not far off, with replacement occurring a bit earlier. This demonstrates that large biases in the value functions need not translate into the same level of biases in the policy functions.</p>
+<p>Finally, note that this solution was obtained after only 30,000 function updates. When compared to the tabular Q-learning solution obtained after 1 million iterations, this represents a speedup factor of 30!</p>
+<hr>
+<h1 id="conclusion">Conclusion</h1>
+<p>The objective of this notebook was to give a brief but concrete introduction to some of the methods used in the modern reinforcement learning literature.</p>
+<p>The key advantages are:</p>
+<ul>
+<li>Less iterations required to reach an adequate solution</li>
+<li>Far less computations of transition probabilities</li>
+<li>Can be used with a simulation model without analytical transition probabilities</li>
+<li>Naturally combines well with function approximation to deal with large state-action spaces</li>
+</ul>
+<p>The key disadvantages are:</p>
+<ul>
+<li>Convergence is no longer guaranteed and can be difficult to verify</li>
+<li>Parallelization is possible but less trivial</li>
+<li>Function approximation introduces bias</li>
+</ul>
+<p>As a reminder, the example problem here is used for its familiarity to economists, but certainly does a poor job of showing the advantage of reinforcement learning techniques. In future notebooks, I hope to provide other examples that better showcase the power of these tools.</p>
+<hr>
+<h1 id="references">References</h1>
+<p>Setup and notation:</p>
+<ul>
+<li>Rust, J. (1987). Optimal Replacement of GMC Bus Engines: An Empirical Model of Harold Zurcher. <em>Econometrica</em>, 55(5), 999-1033.</li>
+</ul>
+<p>Papers in economics:</p>
+<ul>
+<li>Iskhakov, F., Rust, J., &amp; Schjerning, B. (2020). Machine learning and structural econometrics: contrasts and synergies. <em>The Econometrics Journal</em>, 23(3), S81-S124.</li>
+<li>Igami, M. (2020). Artificial intelligence as structural estimation: Deep Blue, Bonanza, and AlphaGo. <em>The Econometrics Journal</em>, 23(3), S1-S24.</li>
+</ul>
+<p>Reference textbook:</p>
+<ul>
+<li><a href="https://www.andrew.cmu.edu/course/10-703/textbook/BartoSutton.pdf">Sutton, R. S., &amp; Barto, A. G. (2018). Reinforcement learning: An introduction. MIT press.</a></li>
+</ul>
+<p>Web resources:</p>
+<ul>
+<li><a href="https://rail.eecs.berkeley.edu/deeprlcourse/">CS 285 at Berkeley, taught by Sergey Levine</a></li>
+<li><a href="https://spinningup.openai.com/en/latest/">Spinning up by OpenAI</a></li>
+</ul>
+
+		</section>
+	</article>
+</main>
+<footer>
+
+</footer>
+</div>
+    </body>
+</html>
