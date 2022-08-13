@@ -66,12 +66,12 @@ Note: the methods discussed here are mainly concerned with solving the dynamic p
 <p>Policy function: $a^*(x) \in \mathcal{A}(x)$</p>
 <p>The agent's problem:
 <span class=math>\(
-\begin{align*}
+\begin{aligned*}
 \max_{a} \mathbb{E}_{x_1,x_2,\dots} &\Big[ \sum_{t=0}^\infty \beta^t u(x,a) | x_0 \Big] \\
 &s.t. \\
 a_t &= a(x_t) \\
 Pr(x_{t+1}|x_t) &= p(x_{t+1}|x_t,a(x_t)) 
-\end{align*}
+\end{aligned*}
 \)</span></p>
 <p>We can write the problem in recursive form using the Bellman equation</p>
 <p><span class=math>\[
