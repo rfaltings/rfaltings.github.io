@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Richard Faltings</title><link>https://rfaltings.github.io/</link><description>Recent content on Richard Faltings</description><generator>Hugo -- gohugo.io</generator><language>en-us</language><lastBuildDate>Fri, 12 Aug 2022 00:00:00 +0000</lastBuildDate><atom:link href="https://rfaltings.github.io/index.xml" rel="self" type="application/rss+xml"/><item><title>Research</title><link>https://rfaltings.github.io/research/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://rfaltings.github.io/research/</guid><description>Working papers Rot-Jaune-Verde. Language and Favoritism: Evidence from Swiss Soccer (2022) with Alex Krumer and Michael Lechner. Forthcoming, Kyklos
-Work in progress Limiting pricing flexibility: an analysis of pricing regulations in dockless vehicle markets.
+Squeezing More Juice Out of Lime: Optimal Pricing in Shared Vehicle Platforms (2023). Draft to be uploaded soon!
+Work in progress Optimal Contract Commitment Structures: Evidence from Trucking.
+Equilibria in Decentralized Freight Networks with Nick Buchholz and John Lazarev.
 A reinforcement learning approach to dynamic pricing.</description></item><item><title>Other</title><link>https://rfaltings.github.io/other/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://rfaltings.github.io/other/</guid><description>Honors I am a 2021 Twitch Research fellow
 I am also a beneficiary of the UT Austin Continuing Fellowship for the 2021-2022 Academic Year.
 Code I created a package to generate simple normal form games and sample solutions for students.
