@@ -1,14 +1,15 @@
 <!doctype html><html><head>
 <meta charset=utf-8>
-<meta http-equiv=x-ua-compatible content="IE=edge"><title>Research - Richard Faltings</title>
+<meta http-equiv=x-ua-compatible content="IE=edge"><title> - Richard Faltings</title>
 <link rel=icon type=image/png href=/images/favicon.png><meta name=viewport content="width=device-width,initial-scale=1">
-<meta name=description content="Working papers  Squeezing More Juice Out of Lime: A Novel High-dimensional Pricing Algorithm (2024). Online Appendix
-Abstract: Sophisticated pricing algorithms used by digital transportation platforms have renewed interest in price control policies, but little evidence exists on their redistributive effects. This paper studies a uniform price mandate in the market for shared electric vehicle platforms in Washington, D.C., which prohibits origin- and destination-based pricing. To compute price equilibria encompassing hundreds of prices for specific origin-destination pairs, I develop a new simulation-based pricing algorithm, adapted from the reinforcement learning literature.">
+<meta name=description content="Working papers  Non-Binding Agreements in Matching Markets: Evidence from Trucking (2024)
+ Abstract | Draft coming soon Many matching markets feature non-binding agreements, often giving one party in a transaction the option to renege against a standardized penalty. In some cases, the penalty is non-pecuniary, and is enforced through relational incentives. This paper examines the social welfare implications of such relational penalties in the trucking industry, using novel data from an online freight auction platform.">
+<link rel=preload href=path/to/font.woff2 as=font type=font/woff2 crossorigin=anonymous>
 <script src=https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js></script>
 <link href="https://fonts.googleapis.com/css2?family=Arsenal&display=swap" rel=stylesheet>
 <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville&display=swap" rel=stylesheet>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@1,500&display=swap" rel=stylesheet>
-<link rel=stylesheet type=text/css media=screen href=https://rfaltings.github.io/css/main.2b7316798cc87c020f5013a43467313b07ee284b008acff3b45e699b3d6b146f.css>
+<link rel=stylesheet type=text/css media=screen href=https://rfaltings.github.io/css/main.cacebd217517c1814c678e5fc3935a47d220f14b29780e8e1b482d55733b6f70.css>
 <link id=darkModeStyle rel=stylesheet type=text/css href=https://rfaltings.github.io/css/dark.d22b786befdd186e3ad0557da579d02635292839ec143ba11c002f1e078f4eac.css disabled>
 </head>
 <body>
@@ -17,7 +18,7 @@ Abstract: Sophisticated pricing algorithms used by digital transportation platfo
 <a href=https://rfaltings.github.io class=title>Richard Faltings</a>
 </div>
 <nav>
-<a href=/research/ class=active>Research</a> |
+<a href=https://rfaltings.github.io#research-section>Research</a> |
 <a href=/files/cv/rfaltings_cv.pdf target=_blank>CV</a> |
 <a href=/other/>Other</a> |
 <a href=/posts/>Blog</a> |
@@ -31,17 +32,41 @@ Abstract: Sophisticated pricing algorithms used by digital transportation platfo
 <section class=body>
 <h3 id=working-papers>Working papers</h3>
 <hr>
-<p><a href=/Faltings_Scooter_Prices.pdf><em>Squeezing More Juice Out of Lime: A Novel High-dimensional Pricing Algorithm</em> (2024)</a>. <a href=/Faltings_Scooter_Prices_appendix.pdf>Online Appendix</a></p>
-<p>Abstract: Sophisticated pricing algorithms used by digital transportation platforms have renewed interest in price control policies, but little evidence exists on their redistributive effects. This paper studies a uniform price mandate in the market for shared electric vehicle platforms in Washington, D.C., which prohibits origin- and destination-based pricing. To compute price equilibria encompassing hundreds of prices for specific origin-destination pairs, I develop a new simulation-based pricing algorithm, adapted from the reinforcement learning literature. I apply the algorithm to a demand system estimated using geolocation data from all firms in the market. In the counterfactual exercise, I find that the redistributive effects of the price controls are mild, and mainly serve riders in the periphery of the city. Furthermore, I find that relaxing the price controls increases rides taken by consumers by 41%, firm profits by 34%, and increases consumer welfare by more than double the profit increase (80% of firm profits).</p>
-<p>This <a href="https://colab.research.google.com/drive/1cMJtJbQ1jfibjtclYfh32V4R7poTqqzp?usp=sharing">notebook</a> on Google colab allows you to play around with the reinforcement learning algorithm in a simple example presented in Section 2.1 of the paper.</p>
+<p><em>Non-Binding Agreements in Matching Markets: Evidence from Trucking</em> (2024)</p>
+<p><script src=https://rfaltings.github.io/js/accordion.js></script>
+<a href=javascript:void(0); class=show-abstract onclick="toggleAccordion('abstract_jmp')">Abstract</a> | Draft coming soon
+<div id=abstract_jmp class=panel>
+Many matching markets feature non-binding agreements, often giving one party in a transaction the option to renege against a standardized penalty. In some cases, the penalty is non-pecuniary, and is enforced through relational incentives. This paper examines the social welfare implications of such relational penalties in the trucking industry, using novel data from an online freight auction platform. First, I document widespread reneging on the platform and develop a theoretical model of the carrier search process with stochastic offers from outside the platform. I show the importance of considering both the direct effect of the penalty on reneging behavior, as well as the equilibrium pass-through of lost welfare to the final transaction price. Using structural estimates of the model, I simulate counterfactual cancellation schedules with both increasing and uniform penalties. I find that the current near-zero penalties are nearly optimal for social welfare. I also consider a switch to pecuniary penalties. The socially optimal pecuniary penalty increases overall welfare by 1.6%, driven by an increase in platform profits of 8.4%. The profit-maximizing penalty raises platform profits by 61.4% but reduces overall welfare by 5.4%, indicating that while pecuniary penalties create gains from trade, they also allow the platform to extract more rents from carriers, reducing overall efficiency.
+</div>
+</p>
+<p><em>Squeezing More Juice Out of Lime: A Novel High-dimensional Pricing Algorithm</em> (2024).</p>
+<p>Under review.</p>
+<p><script src=https://rfaltings.github.io/js/accordion.js></script>
+<a href=javascript:void(0); class=show-abstract onclick="toggleAccordion('abstract_lime')">Abstract</a> | <a href=/Faltings_Scooter_Prices.pdf>Draft</a> | <a href=/Faltings_Scooter_Prices_appendix.pdf>Appendix</a> | <a href="https://colab.research.google.com/drive/1cMJtJbQ1jfibjtclYfh32V4R7poTqqzp?usp=sharing">Google Colab Example</a>
+<div id=abstract_lime class=panel>
+Sophisticated pricing algorithms used by digital transportation platforms have renewed interest in price control policies, but little evidence exists on their redistributive effects. This paper studies a uniform price mandate in the market for shared electric vehicle platforms in Washington, D.C., which prohibits origin- and destination-based pricing. To compute price equilibria encompassing hundreds of prices for specific origin-destination pairs, I develop a new simulation-based pricing algorithm, adapted from the reinforcement learning literature. I apply the algorithm to a demand system estimated using geolocation data from all firms in the market. In the counterfactual exercise, I find that the redistributive effects of the price controls are mild, and mainly serve riders in the periphery of the city. Furthermore, I find that relaxing the price controls increases rides taken by consumers by 41%, firm profits by 34%, and increases consumer welfare by more than double the profit increase (80% of firm profits).
+</div>
+</p>
 <h3 id=work-in-progress>Work in progress</h3>
 <hr>
-<p><em>Slow Auctions, Fast Prices: Optimal Design of a Trucking Procurement Platform.</em></p>
+<p><em>From Favorites to Fresh Faces: Viewer Loyalty and New Creators in Livestreaming</em> (2024) with Alexander Tang.</p>
+<p><script src=https://rfaltings.github.io/js/accordion.js></script>
+<a href=javascript:void(0); class=show-abstract onclick="toggleAccordion('abstract_twitch')">Abstract</a>
+<div id=abstract_twitch class=panel>
+As the gig economy grows, an increasing number of individuals are relying on content creation for their livelihood. The design of platform recommendation algorithms plays a critical role in the discovery and success of new creators. This study presents novel evidence from a natural experiment on the Twitch livestreaming platform to quantify this entry barrier. We analyze eight weeks of high-frequency viewership panel data for all World of Warcraft streams, focusing on the period surrounding the launch of a new game expansion that substantially increased both viewership and the number of streamers. Our findings highlight the significant role of viewer favorites, with the median viewer dedicating 60% of their time to a single streamer pre-launch and 48% post-launch. We also observe considerable stickiness in these preferences; fresh viewers in the post-launch period are twice as likely to watch fresh streamers compared to those active pre-launch. These patterns have important implications for the entry of new streamers and inform the design of recommendation algorithms. Future work aims to develop a theoretical model to understand the impact of these dynamics on the equilibrium distribution of viewership across streamers.
+</div>
+</p>
 <p><em>Equilibria in Decentralized Freight Networks</em> with <a href=https://nbuchholz.scholar.princeton.edu/>Nick Buchholz</a> and <a href=http://www.johnlazarev.com/>John Lazarev</a>.</p>
-<p><em>A reinforcement learning approach to dynamic pricing.</em></p>
 <h3 id=publications>Publications</h3>
 <hr>
-<p><a href=https://doi.org/10.1111/kykl.12332><em>Rot-Jaune-Verde. Language and Favoritism: Evidence from Swiss Soccer</em> (2023)</a> with <a href=https://sites.google.com/view/alex-krumer/home>Alex Krumer</a> and <a href=https://www.michael-lechner.eu/>Michael Lechner</a>. <em>Kyklos</em>, 76( 3), 380–406.</p>
+<p><a href=https://doi.org/10.1111/kykl.12332><em>Rot-Jaune-Verde. Language and Favoritism: Evidence from Swiss Soccer</em> (2023)</a> with <a href=https://sites.google.com/view/alex-krumer/home>Alex Krumer</a> and <a href=https://www.michael-lechner.eu/>Michael Lechner</a>.</p>
+<p><em>Kyklos</em>, 76( 3), 380–406.</p>
+<p><script src=https://rfaltings.github.io/js/accordion.js></script>
+<a href=javascript:void(0); class=show-abstract onclick="toggleAccordion('accordion_FKL')">Abstract</a> | <a href=https://doi.org/10.1111/kykl.12332>Publication link</a> | <a href=https://ux-tauri.unisg.ch/RePEc/usg/econwp/EWP-1915.pdf>Working Paper (with causal forests)</a>
+<div id=accordion_FKL class=panel>
+We utilize data from 5,010 soccer games in the top two Swiss divisions between the 2005/06 and 2018/19 seasons. In these games, a referee can share the same linguistic area with one of the teams. Using referee-per-season fixed effects, we find that referees issue significantly more penalties, in the form of yellow cards, to teams that are not from the referee's linguistic area. We also find some evidence, in the highest level league only, that referees issue more red cards to teams that are not from their linguistic area and that away teams achieve fewer points when home teams share the same linguistic area with the referee. Our analyses suggest that referees' bias is likely to be subconscious and reflexive rather than being a deliberate act of discrimination.
+</div>
+</p>
 </section>
 </article>
 </main>
